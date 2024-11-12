@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Corporate Sociometry Graph</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        #graph {
+            width: 100%;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        
+        .links line {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+
+        .nodes circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            pointer-events: none;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            max-width: 200px;
+        }
+
+        .department {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .cognitive-style {
+            margin-top: 3px;
+        }
+
+        .node-label {
+            font-size: 10px;
+            font-family: Arial, sans-serif;
+        }
+        
+        .link-label {
+            font-size: 8px;
+            fill: #666;
+            font-family: Arial, sans-serif;
+            text-anchor: middle;
+            transform: translateY(0.3em);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="graph"></div>
+
+<script>
+// Set dimensions
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const data = {
+    nodes: [
+        // Leadership
+        {id: "AR", name: "Ahmad Al-Rashid", department: "Leadership", 
+         styles: {"Assertive": 60, "Professional": 25, "Critical": 15}},
+        {id: "MA", name: "Michael Anderson", department: "Leadership",
+         styles: {"Constructive": 50, "Professional": 30, "Enthusiastic": 20}},
+        {id: "FA", name: "Fatima Al-Qassim", department: "Leadership",
+         styles: {"Professional": 55, "Assertive": 25, "Constructive": 20}},
+        
+        // Project Alpha
+        {id: "WT", name: "William Thompson", department: "Project Alpha",
+         styles: {"Professional": 45, "Constructive": 35, "Enthusiastic": 20}},
+        {id: "SM", name: "Sarah Mitchell", department: "Project Alpha",
+         styles: {"Passive-Aggressive": 40, "Professional": 35, "Defensive": 25}},
+        {id: "OS", name: "Omar Al-Sayed", department: "Project Alpha",
+         styles: {"Professional": 50, "Constructive": 30, "Neutral": 20}},
+        {id: "MH", name: "Mariam Al-Hashimi", department: "Project Alpha",
+         styles: {"Enthusiastic": 45, "Professional": 35, "Constructive": 20}},
+        
+        // Project Beta
+        {id: "HA", name: "Hassan Al-Mahmoud", department: "Project Beta",
+         styles: {"Professional": 50, "Assertive": 30, "Critical": 20}},
+        {id: "EP", name: "Elizabeth Parker", department: "Project Beta",
+         styles: {"Constructive": 45, "Professional": 35, "Enthusiastic": 20}},
+        {id: "JC", name: "James Cooper", department: "Project Beta",
+         styles: {"Passive-Aggressive": 40, "Defensive": 35, "Professional": 25}},
+        {id: "NA", name: "Noura Al-Zahrani", department: "Project Beta",
+         styles: {"Professional": 55, "Constructive": 25, "Neutral": 20}},
+        
+        // Project Gamma
+        {id: "MQ", name: "Mohammed Al-Qahtani", department: "Project Gamma",
+         styles: {"Professional": 50, "Enthusiastic": 30, "Constructive": 20}},
+        {id: "KW", name: "Katherine Wilson", department: "Project Gamma",
+         styles: {"Professional": 45, "Assertive": 35, "Critical": 20}},
+        {id: "RS", name: "Robert Stevens", department: "Project Gamma",
+         styles: {"Frustrated": 40, "Professional": 35, "Defensive": 25}},
+        {id: "LH", name: "Leila Al-Harbi", department: "Project Gamma",
+         styles: {"Constructive": 55, "Professional": 25, "Enthusiastic": 20}},
+        
+        // Operations
+        {id: "KN", name: "Khalid Al-Nasser", department: "Operations",
+         styles: {"Professional": 50, "Constructive": 30, "Neutral": 20}},
+        {id: "JB", name: "Jennifer Brooks", department: "Operations",
+         styles: {"Professional": 45, "Supportive": 35, "Neutral": 20}},
+        {id: "AD", name: "Aisha Al-Dubai", department: "Operations",
+         styles: {"Professional": 55, "Enthusiastic": 25, "Constructive": 20}},
+        
+        // Technical
+        {id: "TR", name: "Thomas Richardson", department: "Technical",
+         styles: {"Professional": 50, "Frustrated": 30, "Defensive": 20}},
+        {id: "IK", name: "Ibrahim Al-Kuwaiti", department: "Technical",
+         styles: {"Professional": 45, "Constructive": 35, "Neutral": 20}}
+    ],
+    links: []
+};
+
+// Generate links from the relationship matrix
+const relationshipScores = [
+    [0, 86.8, 83.7, 82.3, 79.5, 81.2, 78.4, 80.2, 77.8, 75.4, 79.8, 78.5, 76.2, 74.8, 77.3, 83.2, 81.5, 82.4, 79.2, 78.5],
+    [86.8, 0, 88.8, 83.5, 80.2, 82.4, 79.5, 81.4, 79.2, 76.8, 80.5, 79.2, 77.5, 75.9, 78.4, 84.5, 82.8, 83.2, 80.1, 79.4],
+    [83.7, 88.8, 0, 81.8, 78.9, 80.7, 77.8, 79.8, 77.5, 74.9, 78.9, 77.6, 75.8, 74.2, 76.7, 82.9, 81.2, 81.6, 78.5, 77.8],
+    [82.3, 83.5, 81.8, 0, 82.4, 85.3, 79.8, 79.5, 77.2, 74.6, 78.5, 77.2, 75.4, 73.8, 76.3, 82.5, 80.8, 81.2, 78.1, 77.4],
+    [79.5, 80.2, 78.9, 82.4, 0, 77.6, 76.5, 76.8, 74.5, 71.9, 75.8, 74.5, 72.7, 71.1, 73.6, 79.8, 78.1, 78.5, 75.4, 74.7],
+    [81.2, 82.4, 80.7, 85.3, 77.6, 0, 84.2, 78.4, 76.1, 73.5, 77.4, 76.1, 74.3, 72.7, 75.2, 81.4, 79.7, 80.1, 77.0, 76.3],
+    [78.4, 79.5, 77.8, 79.8, 76.5, 84.2, 0, 75.6, 73.3, 70.7, 74.6, 73.3, 71.5, 69.9, 72.4, 78.6, 76.9, 77.3, 74.2, 73.5],
+    [80.2, 81.4, 79.8, 79.5, 76.8, 78.4, 75.6, 0, 83.2, 75.4, 88.6, 81.5, 79.7, 78.1, 80.6, 83.8, 82.1, 82.5, 79.4, 78.7],
+    [77.8, 79.2, 77.5, 77.2, 74.5, 76.1, 73.3, 83.2, 0, 78.9, 82.3, 79.2, 77.4, 75.8, 78.3, 81.5, 79.8, 80.2, 77.1, 76.4],
+    [75.4, 76.8, 74.9, 74.6, 71.9, 73.5, 70.7, 75.4, 78.9, 0, 76.8, 75.6, 73.8, 72.2, 74.7, 77.9, 76.2, 76.6, 73.5, 72.8],
+    [79.8, 80.5, 78.9, 78.5, 75.8, 77.4, 74.6, 88.6, 82.3, 76.8, 0, 80.4, 78.6, 77.0, 79.5, 82.7, 81.0, 81.4, 78.3, 77.6],
+    [78.5, 79.2, 77.6, 77.2, 74.5, 76.1, 73.3, 81.5, 79.2, 75.6, 80.4, 0, 84.5, 77.2, 85.9, 81.4, 79.7, 80.1, 77.0, 76.3],
+    [76.2, 77.5, 75.8, 75.4, 72.7, 74.3, 71.5, 79.7, 77.4, 73.8, 78.6, 84.5, 0, 79.8, 81.2, 79.6, 77.9, 78.3, 75.2, 74.5],
+    [74.8, 75.9, 74.2, 73.8, 71.1, 72.7, 69.9, 78.1, 75.8, 72.2, 77.0, 77.2, 79.8, 0, 78.4, 78.0, 76.3, 76.7, 73.6, 72.9],
+    [77.3, 78.4, 76.7, 76.3, 73.6, 75.2, 72.4, 80.6, 78.3, 74.7, 79.5, 85.9, 81.2, 78.4, 0, 80.5, 78.8, 79.2, 76.1, 75.4],
+    [83.2, 84.5, 82.9, 82.5, 79.8, 81.4, 78.6, 83.8, 81.5, 77.9, 82.7, 81.4, 79.6, 78.0, 80.5, 0, 87.6, 86.4, 83.3, 82.6],
+    [81.5, 82.8, 81.2, 80.8, 78.1, 79.7, 76.9, 82.1, 79.8, 76.2, 81.0, 79.7, 77.9, 76.3, 78.8, 87.6, 0, 85.2, 81.6, 80.9],
+    [82.4, 83.2, 81.6, 81.2, 78.5, 80.1, 77.3, 82.5, 80.2, 76.6, 81.4, 80.1, 78.3, 76.7, 79.2, 86.4, 85.2, 0, 82.0, 81.3],
+    [79.2, 80.1, 78.5, 78.1, 75.4, 77.0, 74.2, 79.4, 77.1, 73.5, 78.3, 77.0, 75.2, 73.6, 76.1, 83.3, 81.6, 82.0, 0, 82.5],
+    [78.5, 79.4, 77.8, 77.4, 74.7, 76.3, 73.5, 78.7, 76.4, 72.8, 77.6, 76.3, 74.5, 72.9, 75.4, 82.6, 80.9, 81.3, 82.5, 0]
+];
+
+// Generate links with threshold to avoid too many weak connections
+const threshold = 60; // Only show relationships stronger than 80%
+for (let i = 0; i < relationshipScores.length; i++) {
+    for (let j = i + 1; j < relationshipScores[i].length; j++) {
+        if (relationshipScores[i][j] > threshold) {
+            data.links.push({
+                source: data.nodes[i].id,
+                target: data.nodes[j].id,
+                value: relationshipScores[i][j]
+            });
+        }
+    }
+}
+
+const color = d3.scaleOrdinal()
+    .domain(["Leadership", "Project Alpha", "Project Beta", "Project Gamma", "Operations", "Technical"])
+    .range(["#ff7f00", "#984ea3", "#4daf4a", "#377eb8", "#e41a1c", "#ffff33"]);
+
+const simulation = d3.forceSimulation(data.nodes)
+    .force("link", d3.forceLink(data.links).id(d => d.id).distance(150))
+    .force("charge", d3.forceManyBody().strength(-500))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collision", d3.forceCollide().radius(30));
+
+const svg = d3.select("#graph")
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+// Create link group
+const linkGroup = svg.append("g")
+    .attr("class", "links");
+
+// Create links
+const link = linkGroup.selectAll("line")
+    .data(data.links)
+    .enter().append("line")
+    .attr("stroke-width", d => (d.value - threshold) / 5);
+
+// Create link labels
+const linkLabels = linkGroup.selectAll(".link-label")
+    .data(data.links)
+    .enter().append("text")
+    .attr("class", "link-label")
+    .text(d => d.value.toFixed(1));
+
+const node = svg.append("g")
+    .attr("class", "nodes")
+    .selectAll("circle")
+    .data(data.nodes)
+    .enter().append("circle")
+    .attr("r", 15)
+    .attr("fill", d => color(d.department))
+    .call(d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended));
+
+const labels = svg.append("g")
+    .attr("class", "labels")
+    .selectAll("text")
+    .data(data.nodes)
+    .enter().append("text")
+    .attr("class", "node-label")
+    .text(d => d.id)
+    .attr("dx", 18)
+    .attr("dy", 6);
+
+const tooltip = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
+
+node.on("mouseover", function(event, d) {
+    tooltip.transition()
+        .duration(200)
+        .style("opacity", .9);
+    
+    let tooltipContent = `
+        <div class="department">${d.department}</div>
+        <div>${d.name}</div>
+        <div class="cognitive-styles">
+            ${Object.entries(d.styles).map(([style, value]) => 
+                `<div class="cognitive-style">${style}: ${value}%</div>`
+            ).join('')}
+        </div>
+    `;
+    
+    tooltip.html(tooltipContent)
+        .style("left", (event.pageX + 10) + "px")
+        .style("top", (event.pageY - 10) + "px");
+})
+.on("mouseout", function(d) {
+    tooltip.transition()
+        .duration(500)
+        .style("opacity", 0);
+});
+
+function ticked() {
+    link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+    // Update link labels position
+    linkLabels
+        .attr("x", d => (d.source.x + d.target.x) / 2)
+        .attr("y", d => (d.source.y + d.target.y) / 2);
+
+    node
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+
+    labels
+        .attr("x", d => d.x)
+        .attr("y", d => d.y);
+}
+
+simulation
+    .nodes(data.nodes)
+    .on("tick", ticked);
+
+simulation.force("link")
+    .links(data.links);
+
+function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+}
+
+function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+}
+
+function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+}
+</script>
+</body>
+</html>
