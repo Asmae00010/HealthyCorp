@@ -154,7 +154,7 @@ const relationshipScores = [
 ];
 
 // Generate links with threshold to avoid too many weak connections
-const threshold = 60; // Only show relationships stronger than 80%
+const threshold = 80; // Only show relationships stronger than 80%
 for (let i = 0; i < relationshipScores.length; i++) {
     for (let j = i + 1; j < relationshipScores[i].length; j++) {
         if (relationshipScores[i][j] > threshold) {
